@@ -8,6 +8,10 @@ import wave
 import struct
 from moviepy.editor import AudioFileClip
 import tempfile
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from STT import STT
+import token
 
 app = Flask(__name__)
 CORS(app)
@@ -79,7 +83,7 @@ def detect_song(input_audio_path):
 
         url = 'https://shazam.p.rapidapi.com/songs/v2/detect'
         headers = {
-            'x-rapidapi-key': 'cbf2457315msh63ef19f2050181cp19c4e5jsn270172b532c3',
+            'x-rapidapi-key': token.shazam_token,
             'x-rapidapi-host': 'shazam.p.rapidapi.com',
             'Content-Type': 'text/plain'
         }
@@ -112,11 +116,189 @@ def upload_file():
         file_path = temp_file.name
         file.save(file_path)
 
-    # Call detect_song function with the saved file path
     result = detect_song(file_path)
     title = result.get('track', {}).get('title', 'Unknown Title')
     print(title)
     return jsonify(title)
+
+@app.route('/upload_stt', methods=['POST'])
+def upload_stt():
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part in the request'}), 400
+    language = request.form.get('language')
+    print(language)
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'message': 'No selected file'}), 400
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
+        file_path = temp_file.name
+        file.save(file_path)
+        print(f"File saved to: {file_path}")
+    if language=='en':
+        language='英語'
+    elif language=='zh':
+        language='華語'
+    elif language=='id':
+        language='印尼語'
+    elif language=='tai':
+        language='台語'
+    else:
+        language='華語'
+
+    print(language)
+    try:
+        token = token.stt_token
+        segment = "False"
+        stt = STT(token=token, language=language, segment=segment)
+        sentence = stt.request(file_path)
+        print(f"Transcription: {sentence}")
+        return jsonify({"transcription": sentence})
+    except Exception as e:
+        print(f"STT error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+client = MongoClient('mongodb://localhost:27017/')
+db = client.playlists_db
+playlists_collection = db.playlists
+
+@app.route('/update-playlist', methods=['POST'])
+def update_playlist():
+    data = request.json
+    song = data['song']
+    selected_playlist_ids = data['selectedPlaylistIds']
+    unselected_playlist_ids = data['unselectedPlaylistIds']
+    updated_playlists = []
+
+    for playlist_id in selected_playlist_ids:
+        playlist = playlists_collection.find_one({"_id": ObjectId(playlist_id)})
+        if playlist:
+            if 'songs' not in playlist:
+                playlist['songs'] = []
+            if not any(existing_song['id']['videoId'] == song['id']['videoId'] for existing_song in playlist['songs']):
+                playlist['songs'].append(song)
+                playlists_collection.update_one({"_id": ObjectId(playlist_id)}, {"$set": playlist})
+            updated_playlists.append({
+                'id': str(playlist['_id']),
+                'name': playlist['name'],
+                'songCount': len(playlist['songs']),
+                'songIds': [existing_song['id']['videoId'] for existing_song in playlist['songs']]
+            })
+
+    for playlist_id in unselected_playlist_ids:
+        playlist = playlists_collection.find_one({"_id": ObjectId(playlist_id)})
+        if playlist and 'songs' in playlist:
+            playlist['songs'] = [existing_song for existing_song in playlist['songs'] if existing_song['id']['videoId'] != song['id']['videoId']]
+            playlists_collection.update_one({"_id": ObjectId(playlist_id)}, {"$set": playlist})
+            updated_playlists.append({
+                'id': str(playlist['_id']),
+                'name': playlist['name'],
+                'songCount': len(playlist['songs']),
+                'songIds': [existing_song['id']['videoId'] for existing_song in playlist['songs']]
+            })
+
+    return jsonify({'updated_playlists': updated_playlists})
+
+@app.route('/add-playlist', methods=['POST'])
+def add_playlist():
+    data = request.json
+    new_playlist = data['playlist']
+    new_playlist['songs'] = []
+    new_playlist['songCount'] = 0
+    result = playlists_collection.insert_one(new_playlist)
+    new_playlist_id = result.inserted_id
+    return jsonify({'id': str(new_playlist_id), 'message': 'Playlist added successfully'})
+
+@app.route('/playlists', methods=['GET'])
+def get_playlists():
+    playlists = playlists_collection.find()
+    result = []
+    for playlist in playlists:
+        result.append({
+            'id': str(playlist['_id']),
+            'name': playlist['name'],
+            'songCount': len(playlist['songs']) if 'songs' in playlist else 0,  # Ensure songCount is calculated
+            'songIds': [song['id']['videoId'] for song in playlist['songs']] if 'songs' in playlist else []  # Ensure songIds are included
+        })
+    return jsonify(result)
+
+@app.route('/playlist/<playlist_id>', methods=['GET'])
+def get_playlist_details(playlist_id):
+    playlist = playlists_collection.find_one({"_id": ObjectId(playlist_id)})
+    if playlist:
+        return jsonify({
+            'id': str(playlist['_id']),
+            'name': playlist['name'],
+            'songs': playlist.get('songs', []),
+            'songCount': playlist.get('songCount', 0)
+        })
+    else:
+        return jsonify({'message': 'Playlist not found'}), 404
+    
+@app.route('/delete-song', methods=['POST'])
+def delete_song():
+    data = request.json
+    song_id = data['songId']
+    playlist_id = data['playlistId']
+    print(f"Received song_id: {song_id}, playlist_id: {playlist_id}")
+
+    # Find the playlist
+    playlist = playlists_collection.find_one({"_id": ObjectId(playlist_id)})
+    if not playlist:
+        print("Playlist not found")
+        return jsonify({'message': 'Playlist not found'}), 404
+
+    print(f"Playlist found: {playlist}")
+
+    # Check if 'songs' key exists in the playlist
+    if 'songs' not in playlist:
+        print("No songs key in playlist")
+        return jsonify({'message': 'No songs key in playlist'}), 404
+
+    # Filter out the song to be deleted
+    original_song_count = len(playlist['songs'])
+    playlist['songs'] = [song for song in playlist['songs'] if song['id']['videoId'] != song_id]
+    updated_song_count = len(playlist['songs'])
+
+    if original_song_count == updated_song_count:
+        print("Song not found in playlist")
+        return jsonify({'message': 'Song not found in playlist'}), 404
+
+    # Update the playlist
+    result = playlists_collection.update_one(
+        {"_id": ObjectId(playlist_id)},
+        {"$set": {"songs": playlist['songs']}}
+    )
+
+    print(f"Updated playlist: {result.modified_count} document(s) modified")
+    return jsonify({'message': 'Song deleted', 'playlistId': playlist_id})
+
+@app.route('/rename-playlist', methods=['POST'])
+def rename_playlist():
+    playlist_id = request.json.get('playlistId')
+    new_name = request.json.get('newName')
+    
+    if not playlist_id or not new_name:
+        return jsonify({'message': 'Invalid input'}), 400
+    
+    result = playlists_collection.update_one(
+        {"_id": ObjectId(playlist_id)},
+        {"$set": {"name": new_name}}
+    )
+    
+    if result.matched_count > 0:
+        return jsonify({'message': 'Playlist renamed successfully'})
+    else:
+        return jsonify({'message': 'Playlist not found'}), 404
+
+@app.route('/delete-playlist', methods=['POST'])
+def delete_playlist():
+    data = request.json
+    playlist_id = data['playlistId']
+    result = playlists_collection.delete_one({"_id": ObjectId(playlist_id)})
+    if result.deleted_count > 0:
+        return jsonify({'message': 'Playlist deleted', 'playlistId': playlist_id})
+    return jsonify({'message': 'Playlist not found'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

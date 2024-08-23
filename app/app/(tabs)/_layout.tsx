@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NativeBaseProvider } from 'native-base';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -11,7 +11,9 @@ import { Playing } from '@/components/Playing';
 
 const TabLayoutContent = () => {
   const colorScheme = useColorScheme();
-  const { playing, currentSong, setPlaying, language, showMusic } = useInput();
+  const { playing, currentSong, setPlaying, language ,fetchPlaylists} = useInput();
+
+  
 
   const onStateChange = useCallback((state) => {
     if (state === 'ended') {
@@ -22,8 +24,8 @@ const TabLayoutContent = () => {
   const tabLabel = {
     en: ['Home', 'My List'],
     zh: ['首頁', '我的列表'],
+    tai: ['首頁', '我的列表'],
     id: ['Halaman Utama', 'Lagu Saya'],
-    tai: ['', ''],
   };
 
   return (
@@ -70,11 +72,11 @@ const TabLayoutContent = () => {
 
 export default function TabLayout() {
   return (
-    <InputProvider>
+
       <NativeBaseProvider>
         <TabLayoutContent />
       </NativeBaseProvider>
-    </InputProvider>
+
   );
 }
 

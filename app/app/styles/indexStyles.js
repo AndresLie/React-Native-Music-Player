@@ -50,7 +50,7 @@ export default StyleSheet.create({
   },
   flatListContent: {
     paddingBottom: 100,
-    width:'95%'
+    width:'105%'
   },
   controlWrapper: { 
     display: 'flex', 
@@ -66,10 +66,8 @@ export default StyleSheet.create({
     backgroundColor: 'white',
     padding: 20,
     zIndex: 9,
-
-    
-
-  },musicNav:{
+  },
+  musicNav:{
     opacity:1,
     width:'50%',
     left:'0%'

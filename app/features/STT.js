@@ -1,7 +1,11 @@
+import base64 from 'react-native-base64';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import { stt_key } from './key';
+
 class STTClient {
-  // token 有效期限 113/3/25 ~ 113/9/1
   constructor() {
-    this.token = "5FcW6E8HcOUNyRcfxFJe8H0J4AudU8wWqPGqka5gPmNTSWQwGGRfENaTCL8qyd8W";
+    this.token = stt_key;
     this.language2ServiceID = {
       "華語": "A017",
       "台語": "A018",
@@ -32,7 +36,9 @@ class STTClient {
       "token": this.token,
       "service_id": this.language2ServiceID[language],
       "audio_format": "wav",
-      "mode": "Segmentation"
+      "segment": "False",
+      "correction": "False",
+      "streaming_id": null
     };
     console.log('Request Body:', requestBody);
 
@@ -63,17 +69,29 @@ class STTClient {
   }
 }
 
-// Example usage:
-const client = new STTClient();
-const base64Audio = 'your_base64_audio_string_here';
-const language = 'en'; // Use the appropriate language code
+// Function to record audio and get base64 string
+async function recordAudio() {
+  const recording = new Audio.Recording();
+  try {
+    await recording.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+    await recording.startAsync();
 
-client.askForService(base64Audio, language)
-  .then(sentence => {
-    console.log('Transcribed sentence:', sentence);
-  })
-  .catch(error => {
-    console.error('Error:', error);
-  });
+    console.log('Recording...');
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Record for 3 seconds
+    await recording.stopAndUnloadAsync();
 
-export default STTClient;
+    const uri = recording.getURI();
+    console.log('Recording stopped and saved at:', uri);
+
+    const file = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    console.log('Recording converted to base64');
+    return file;
+  } catch (error) {
+    console.error('Failed to record audio', error);
+  }
+}
+
+export { STTClient, recordAudio };

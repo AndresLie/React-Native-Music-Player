@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Input, Box, Button, FormControl, WarningOutlineIcon, Icon, HStack, Center } from 'native-base';
 import { Ionicons } from '@expo/vector-icons';
-import { MusicCard } from '@/components/MusicCard';
+import { MusicCard } from '@/components/Card/MusicCard';
 import { InputSelector } from '@/components/Selector/InputSelector';
 import { LanguageSelector } from '@/components/Selector/LanguageSelector';
 import { useInput } from '@/context/InputContext';
@@ -15,10 +15,11 @@ import {headerLabel,searchLabel,errorDetectionLabel,inputPlaceholderLabel} from 
 import { LoadingSpinner } from '../../components/Spinner';
 import { MusicCardSkeleton } from '../../components/MusicCardSkeleton';
 import { Playing } from '../../components/Playing';
-
+import {ip} from '@/backend_ip'
+import { youtube_key } from './key';
 
 export default function HomeScreen() {
-  const { searchBar, handleSearchBar, language, searchBy,showMusic,results,handleResult } = useInput();
+  const { searchBar, handleSearchBar, language, searchBy,showMusic,queue,handleQueue,searchResults,handleSearchResults } = useInput();
   const [emptySearch, setEmptySearch] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
@@ -44,8 +45,10 @@ export default function HomeScreen() {
 
 
   const handleInputChange = (e) => handleSearchBar(e.nativeEvent.text);
-
-  const search = async () => {
+  const handleSubmitEditing = () => {
+    search();
+  };
+  const search = async (input) => {
     if (!searchBar) {
       setEmptySearch(true);
       return;
@@ -57,9 +60,9 @@ export default function HomeScreen() {
         params: {
           part: 'snippet',
           type: 'video',
-          q: searchBar,
+          q: input?input:searchBar,
           videoCategoryId: '10', // Music category
-          key: 'AIzaSyAJzV3ZNSlPXpIyP-Vqn4bdHGETaglQHlM', 
+          key: youtube_key, 
           maxResults:8,
         }
       });
@@ -69,7 +72,7 @@ export default function HomeScreen() {
           params: {
             part: 'contentDetails,status',
             id: item.id.videoId,
-            key: 'AIzaSyAJzV3ZNSlPXpIyP-Vqn4bdHGETaglQHlM' // Replace with your YouTube API key
+            key: youtube_key // Replace with your YouTube API key
           }
         });
 
@@ -82,7 +85,7 @@ export default function HomeScreen() {
 
       const detailedResults = await Promise.all(videoDetailsPromises);
       const embeddableResults = detailedResults.filter(item => item.embeddable);
-      handleResult(embeddableResults);
+      handleSearchResults(embeddableResults);
       console.log(embeddableResults[0]);
     } catch (error) {
       console.error('Error searching for tracks:', error.response ? error.response.data : error.message);
@@ -132,31 +135,15 @@ export default function HomeScreen() {
 
   const onStopRecord = async () => {
     if (recording) {
-        setIsLoading(()=>true)
+        setIsLoading(true);
         console.log("Stopping recorder...");
         setIsRecording(false);
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         console.log('Recording stopped and saved at:', uri);
 
-        if (searchBy === 'TrackInfo') {
-            const base64 = await FileSystem.readAsStringAsync(uri, {
-                encoding: FileSystem.EncodingType.Base64,
-            });
-            console.log('Recording converted to base64');
-
-            const sttClient = new STTClient();
-            try {
-                let transcribedText = await sttClient.askForService(base64, language);
-                transcribedText = transcribedText.replace("。", "");
-                console.log('Transcribed Text:', transcribedText);
-                handleSearchBar(transcribedText);
-            } catch (error) {
-                console.error('STT Error:', error);
-                Alert.alert('Error', 'Failed to transcribe audio. Please try again.');
-            }
-        } else if (searchBy === 'Detector') {
-            console.log('Detector On');
+        if (searchBy === 'TrackInfo' || searchBy === 'Detector') {
+            console.log('Sending audio for', searchBy);
             try {
                 const formData = new FormData();
                 formData.append('file', {
@@ -165,7 +152,12 @@ export default function HomeScreen() {
                     type: 'audio/wav'
                 });
 
-                const response = await fetch('http://192.168.137.1:5000/upload', {
+                const endpoint = searchBy === 'TrackInfo' ? 'upload_stt' : 'upload';
+                if (searchBy === 'TrackInfo') {
+                    formData.append('language', language);
+                }
+                
+                const response = await fetch(`http://${ip}/${endpoint}`, {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -178,19 +170,41 @@ export default function HomeScreen() {
                 }
 
                 const res = await response.json();
-                console.log(res);
-                res!='Unknown Title'?handleSearchBar(res):Alert.alert(errorDetectionLabel[language][0],errorDetectionLabel[language][1] )
+                console.log('Response received:', res);
+                
+                if (searchBy === 'TrackInfo') {
+                    if (res.transcription) {
+                        console.log('Transcription received:', res.transcription);
+                        handleSearchBar(res.transcription);
+                        search(res.transcription);  // Ensure this is called after handleSearchBar
+                    } else {
+                        Alert.alert('Error', 'Failed to transcribe audio. Please try again.');
+                    }
+                } else {
+                    if (res !== 'Unknown Title') {
+                        console.log('Detection result received:', res);
+                        handleSearchBar(res);
+                        search(res);  // Ensure this is called after handleSearchBar
+                    } else {
+                        Alert.alert(errorDetectionLabel[language][0], errorDetectionLabel[language][1]);
+                    }
+                }
             } catch (error) {
-                console.error('Detect Song Error:', error);
-                Alert.alert('Error', 'Failed to detect song. Please try again.');
+                console.error('Error:', error);
+                Alert.alert('Error', `Failed to process audio for ${searchBy}. Please try again.`);
             }
+        } else {
+            console.error('Invalid searchBy type');
+            Alert.alert('Error', 'Invalid search type. Please try again.');
         }
-        setIsLoading(()=>false)
+        
+        setIsLoading(false);
     } else {
         console.error('No recording instance found');
         Alert.alert('Error', 'No recording instance found. Please try again.');
     }
 };
+
 
   return (
     <View style={styles.container}>
@@ -209,6 +223,8 @@ export default function HomeScreen() {
             onChange={handleInputChange}
             value={searchBar}
             isDisabled={isRecording} // Disable input when recording
+            onSubmitEditing={handleSubmitEditing}
+            returnKeyType="search" 
           />
           {emptySearch && (
             <FormControl.ErrorMessage leftIcon={<WarningOutlineIcon size="xs" />} style={styles.errorMessage}>
@@ -237,7 +253,7 @@ export default function HomeScreen() {
       {!isLoading && !isLoadingList?
       <FlatList
         contentContainerStyle={styles.flatListContent}
-        data={results}
+        data={searchResults}
         keyExtractor={(item) => item.id.videoId}
         renderItem={({ item }) => <MusicCard song={item} />}
         scrollEnabled={!isRecording} 

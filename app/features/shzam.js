@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+import { shazam_key } from './key';
 async function detectSong(base64) {
   try {
     console.log('Starting song detection with base64 data');
@@ -13,7 +13,7 @@ async function detectSong(base64) {
         locale: 'en-US'
       },
       headers: {
-        'x-rapidapi-key': 'cbf2457315msh63ef19f2050181cp19c4e5jsn270172b532c3',
+        'x-rapidapi-key': shazam_key,
         'x-rapidapi-host': 'shazam.p.rapidapi.com',
         'Content-Type': 'text/plain'
       },

@@ -2,7 +2,7 @@ import os
 import requests
 import base64
 import numpy as np
-import wave
+import wave,token
 import struct
 from moviepy.editor import AudioFileClip
 
@@ -73,7 +73,7 @@ def detect_song(input_audio_path):
 
         url = 'https://shazam.p.rapidapi.com/songs/v2/detect'
         headers = {
-            'x-rapidapi-key': 'cbf2457315msh63ef19f2050181cp19c4e5jsn270172b532c3',
+            'x-rapidapi-key': token.shazam_token,
             'x-rapidapi-host': 'shazam.p.rapidapi.com',
             'Content-Type': 'text/plain'
         }

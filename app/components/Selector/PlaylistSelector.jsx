@@ -3,13 +3,12 @@ import { StyleSheet, View } from "react-native";
 import React from 'react';
 import { useInput } from "@/context/InputContext";
 
-export function InputSelector() {
+export function PlaylistSelector() {
   const { searchBy, handleSearchBy, language } = useInput();
   const selectItemLabel = {
-    en: ["By Track Name", 'Song Detector'],
-    zh: ["歌名搜尋", '歌曲偵測器'],
-    tai: ["歌名搜尋", '歌曲偵測器'],
-    id: ['Cari Lagu', 'Pendeteksi Lagu']
+    en: ["Delete Playlist"],
+    zh: ["刪除列表"],
+    id: ['Hapus Koleksi']
   };
 
   return (
@@ -29,7 +28,6 @@ export function InputSelector() {
           borderRadius={50}
         >
           <Select.Item label={selectItemLabel[language][0]} value="TrackInfo" />
-          <Select.Item label={selectItemLabel[language][1]} value="Detector" />
         </Select>
       </Box>
     </View>

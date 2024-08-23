@@ -5,7 +5,7 @@ import { useInput } from '@/context/InputContext';
 
 export function LanguageSelector() {
   const [modalVisible, setModalVisible] = useState(false);
-  const{language,handleLanguange}=useInput()
+  const{language,handleLanguage}=useInput()
   const languageLabels = {
     en: "En",
     zh: "中",
@@ -16,11 +16,11 @@ export function LanguageSelector() {
     en:'Close',
     zh:'關閉',
     id:"Tutup",
-    tai:""
+    tai:"關閉"
   }
 
   const handleLanguageChange = (value) => {
-    handleLanguange(value);
+    handleLanguage(value);
     setModalVisible(false);
   };
 

@@ -1,13 +1,16 @@
 import React, { useEffect, useRef } from "react";
 import { useInput } from "@/context/InputContext";
-import { Box, HStack, Text, VStack } from "native-base";
+import { Box, HStack, Text, VStack, Icon } from "native-base";
 import { StyleSheet, Dimensions, View, Animated, Easing } from "react-native";
 import { GestureHandlerRootView, PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
-
 export function Playing() {
-    const { currentSong, setPlaying,handleCurrentSong,handleShowMusic,playNext,playPrev } = useInput();
+    const navigation = useNavigation();
+
+    const { currentSong, setPlaying, handleCurrentSong, handleShowMusic, playNext, playPrev, playing } = useInput();
     const scrollAnim = useRef(new Animated.Value(0)).current;
 
     if (!currentSong || !currentSong.snippet) {
@@ -45,20 +48,22 @@ export function Playing() {
 
     const onLongPress = () => {
         console.log('Long press detected');
+        navigation.navigate('SongDetail');
+        console.log(playing);
     };
 
     const onPanHandlerStateChange = ({ nativeEvent }) => {
         if (nativeEvent.state === State.END) {
             const { translationX, translationY } = nativeEvent;
-            if ( Math.abs(translationY)<translationX && translationX > 0) {
+            if (Math.abs(translationY) < translationX && translationX > 0) {
                 console.log('Swipe right detected');
-                playPrev()
-            } else if ( Math.abs(translationY)>translationX&&translationX < 0) {
+                playPrev();
+            } else if (Math.abs(translationY) > translationX && translationX < 0) {
                 console.log('Swipe left detected');
-                playNext()
+                playNext();
             } else if (translationY < 0) {
-                handleCurrentSong({id:{videoId:0}})
-                handleShowMusic(false)
+                handleCurrentSong({ id: { videoId: 0 } });
+                handleShowMusic(false);
                 setPlaying(val => !val);
             }
         }
@@ -67,7 +72,7 @@ export function Playing() {
     return (
         <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
             <TapGestureHandler onHandlerStateChange={({ nativeEvent }) => nativeEvent.state === State.ACTIVE && onSingleTap()}>
-                <LongPressGestureHandler onHandlerStateChange={({ nativeEvent }) => nativeEvent.state === State.ACTIVE && onLongPress()} minDurationMs={800}>
+                <LongPressGestureHandler onHandlerStateChange={({ nativeEvent }) => nativeEvent.state === State.ACTIVE && onLongPress()} minDurationMs={600}>
                     <PanGestureHandler onHandlerStateChange={onPanHandlerStateChange}>
                         <View style={styles.MusicNav}>
                             <Box
@@ -80,7 +85,7 @@ export function Playing() {
                                 style={styles.MusicNav}
                             >
                                 <HStack>
-                                    <VStack style={{ flex: 1, justifyContent: 'center' }}>
+                                    <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 20 }}>
                                         <View style={styles.carouselWrapper}>
                                             <Animated.View
                                                 style={[
@@ -100,6 +105,13 @@ export function Playing() {
                                         <Text fontSize='xs' style={styles.artist}>
                                             {currentSong.snippet.channelTitle}
                                         </Text>
+                                        <Icon
+                                            as={Ionicons}
+                                            name={playing ? 'pause' : 'play'}
+                                            size="sm"
+                                            color="darkBlue.600"
+                                            style={styles.playPauseIcon}
+                                        />
                                     </VStack>
                                 </HStack>
                             </Box>
@@ -113,7 +125,6 @@ export function Playing() {
 
 const styles = StyleSheet.create({
     MusicNav: {
-        
         overflow: 'hidden',
         height: '100%',
         padding: 0,
@@ -137,6 +148,9 @@ const styles = StyleSheet.create({
     carouselItem: {
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    playPauseIcon: {
+        marginTop: 4,
     },
 });
 
