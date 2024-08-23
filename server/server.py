@@ -11,7 +11,7 @@ import tempfile
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from STT import STT
-import token
+import MY_KEY as MY_KEY
 
 app = Flask(__name__)
 CORS(app)
@@ -83,7 +83,7 @@ def detect_song(input_audio_path):
 
         url = 'https://shazam.p.rapidapi.com/songs/v2/detect'
         headers = {
-            'x-rapidapi-key': token.shazam_token,
+            'x-rapidapi-key': MY_KEY.shazam_token,
             'x-rapidapi-host': 'shazam.p.rapidapi.com',
             'Content-Type': 'text/plain'
         }
@@ -148,9 +148,9 @@ def upload_stt():
 
     print(language)
     try:
-        token = token.stt_token
+        my_token = MY_KEY.stt_token
         segment = "False"
-        stt = STT(token=token, language=language, segment=segment)
+        stt = STT(token=my_token, language=language, segment=segment)
         sentence = stt.request(file_path)
         print(f"Transcription: {sentence}")
         return jsonify({"transcription": sentence})
