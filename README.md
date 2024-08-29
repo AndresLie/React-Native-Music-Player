@@ -2,6 +2,11 @@
 
 A comprehensive music player application with multi-lingual support (English, Chinese, Indonesian). This project includes features such as a Music Player, Music Detector (similar to Shazam), Speech-to-Text (including support for 台語), Personal Playlist management with full CRUD capabilities, and a Playing Queue system.
 
+## Demo
+
+[![Watch the demo video](https://drive.google.com/file/d/1FYx2QTh-rHPETgsCMaUu0FJMrq6HJT6R/view?usp=sharing)
+
+
 ## Features
 
 - **Music Player**: Play and control your favorite tracks with a built-in player.
